@@ -1,0 +1,1323 @@
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { initializeApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
+
+// ==========================================
+// CUSTOM SVG ICONS (No external dependencies)
+// ==========================================
+const Icons = {
+  Plus: () => (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v12m6-6H6" />
+    </svg>
+  ),
+  Trash: () => (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+    </svg>
+  ),
+  Duplicate: () => (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+    </svg>
+  ),
+  Upload: () => (
+    <svg className="w-5 h-5mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+    </svg>
+  ),
+  Download: () => (
+    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+    </svg>
+  ),
+  Print: () => (
+    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-3a2 2 0 00-2-2H9a2 2 0 00-2 2v3a2 2 0 002 2zm5-17h-2a2 2 0 00-2 2v3h6V4a2 2 0 00-2-2z" />
+    </svg>
+  ),
+  Refresh: () => (
+    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H17" />
+    </svg>
+  ),
+  Sun: () => (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    </svg>
+  ),
+  Moon: () => (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+    </svg>
+  ),
+  Check: () => (
+    <svg className="w-5 h-5 text-emerald-500 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+    </svg>
+  ),
+  Brush: () => (
+    <svg className="w-4 h-4 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+    </svg>
+  ),
+  Eye: () => (
+    <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+    </svg>
+  )
+};
+
+const TEMPLATES = [
+  { id: 'professional', name: 'Professional', bg: 'bg-slate-50', primary: 'text-slate-900', accent: 'bg-indigo-600', border: 'border-slate-300' },
+  { id: 'modern', name: 'Modern Theme', bg: 'bg-teal-50/30', primary: 'text-teal-950', accent: 'bg-teal-600', border: 'border-teal-200' },
+  { id: 'minimal', name: 'Minimalist Black', bg: 'bg-neutral-50', primary: 'text-neutral-900', accent: 'bg-neutral-900', border: 'border-neutral-300' },
+  { id: 'corporate', name: 'Corporate Deep', bg: 'bg-blue-50/40', primary: 'text-blue-950', accent: 'bg-blue-800', border: 'border-blue-300' },
+  { id: 'creative', name: 'Creative Hue', bg: 'bg-purple-50/50', primary: 'text-purple-950', accent: 'bg-gradient-to-r from-purple-600 to-pink-600', border: 'border-purple-200' },
+  { id: 'blueTheme', name: 'Royal Blue', bg: 'bg-sky-50/30', primary: 'text-sky-950', accent: 'bg-sky-600', border: 'border-sky-300' },
+  { id: 'darkTheme', name: 'Classic Dark', bg: 'bg-slate-900', primary: 'text-white', accent: 'bg-emerald-500', border: 'border-slate-700' },
+  { id: 'elegant', name: 'Elegant Serif', bg: 'bg-stone-50', primary: 'text-stone-900', accent: 'bg-amber-800', border: 'border-stone-300', font: 'font-serif' },
+  { id: 'startup', name: 'Startup Bold', bg: 'bg-violet-50/40', primary: 'text-violet-950', accent: 'bg-violet-600', border: 'border-violet-300' },
+  { id: 'freelancer', name: 'Freelancer Green', bg: 'bg-emerald-50/30', primary: 'text-emerald-950', accent: 'bg-emerald-600', border: 'border-emerald-200' },
+];
+
+const CURRENCIES = [
+  { code: 'USD', symbol: '$', label: 'US Dollar ($)' },
+  { code: 'EUR', symbol: '€', label: 'Euro (€)' },
+  { code: 'GBP', symbol: '£', label: 'British Pound (£)' },
+  { code: 'CAD', symbol: 'C$', label: 'Canadian Dollar (C$)' },
+  { code: 'AUD', symbol: 'A$', label: 'Australian Dollar (A$)' },
+  { code: 'AED', symbol: 'د.إ', label: 'UAE Dirham (AED)' },
+  { code: 'SAR', symbol: 'ر.س', label: 'Saudi Riyal (SAR)' },
+  { code: 'INR', symbol: '₹', label: 'Indian Rupee (₹)' },
+  { code: 'PKR', symbol: '₨', label: 'Pakistani Rupee (₨)' },
+  { code: 'QAR', symbol: 'ر.ق', label: 'Qatari Riyal (QAR)' },
+  { code: 'KWD', symbol: 'د.ك', label: 'Kuwaiti Dinar (KWD)' },
+  { code: 'BHD', symbol: '.د.ب', label: 'Bahraini Dinar (BHD)' },
+  { code: 'OMR', symbol: 'ر.ع.', label: 'Omani Rial (OMR)' },
+];
+
+export default function App() {
+  // Navigation & Workspace State
+  const [activeTab, setActiveTab] = useState('home'); // home | privacy | terms | disclaimer | contact
+  const [darkMode, setDarkMode] = useState(false);
+  const [previewMode, setPreviewMode] = useState(false);
+  const [successToast, setSuccessToast] = useState('');
+
+  // Form State: Business Details
+  const [businessName, setBusinessName] = useState('My Business Corp');
+  const [businessAddress, setBusinessAddress] = useState('123 Enterprise Way, Suite 500, Tech City');
+  const [businessPhone, setBusinessPhone] = useState('+1 (555) 019-2834');
+  const [businessEmail, setBusinessEmail] = useState('billing@mybusiness.com');
+  const [businessWebsite, setBusinessWebsite] = useState('www.mybusiness.com');
+  const [businessTaxId, setBusinessTaxId] = useState('VAT-992019348');
+  const [businessLogo, setBusinessLogo] = useState('');
+
+  // Form State: Customer Details
+  const [customerName, setCustomerName] = useState('Acme Corporation');
+  const [customerAddress, setCustomerAddress] = useState('789 Commerce Boulevard, Tower B, New York, NY 10001');
+  const [customerEmail, setCustomerEmail] = useState('accounts@acme.com');
+  const [customerPhone, setCustomerPhone] = useState('+1 (212) 555-8901');
+
+  // Form State: Invoice Metadata
+  const [invoiceNumber, setInvoiceNumber] = useState(`INV-${Date.now().toString().slice(-6)}`);
+  const [issueDate, setIssueDate] = useState(new Date().toISOString().split('T')[0]);
+  const [dueDate, setDueDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    return d.toISOString().split('T')[0];
+  });
+  const [currencyCode, setCurrencyCode] = useState('USD');
+  const [paymentTerms, setPaymentTerms] = useState('Net 30 Days');
+
+  // Items State
+  const [items, setItems] = useState([
+    { id: 1, name: 'Premium Cloud Consulting', description: 'Enterprise structural design & implementation', qty: 20, price: 150, taxRate: 15 },
+    { id: 2, name: 'SaaS Platform Subscription', description: 'Pro License annual plan for enterprise users', qty: 1, price: 1200, taxRate: 5 },
+  ]);
+
+  // Tax and Discount Settings
+  const [taxMode, setTaxMode] = useState('excluded'); // 'excluded' | 'included'
+  const [discountType, setDiscountType] = useState('percent'); // 'percent' | 'fixed'
+  const [discountValue, setDiscountValue] = useState(10);
+  const [shippingCharge, setShippingCharge] = useState(50);
+  const [notes, setNotes] = useState('Thank you for choosing My Business Corp. We appreciate your timely payment via Bank Transfer to Account # US90 1200 4500 1234 56.');
+
+  // Signature Setup
+  const [signatureType, setSignatureType] = useState('draw'); // draw | upload | text
+  const [signatureImage, setSignatureImage] = useState('');
+  const [signatureText, setSignatureText] = useState('Authorized Manager');
+  const [isDrawing, setIsDrawing] = useState(false);
+  const canvasRef = useRef(null);
+
+  // Styling Setup
+  const [currentTemplate, setCurrentTemplate] = useState('professional');
+
+  // Dynamic calculations
+  const currencySymbol = useMemo(() => {
+    return CURRENCIES.find(c => c.code === currencyCode)?.symbol || '$';
+  }, [currencyCode]);
+
+  const calculations = useMemo(() => {
+    let subtotal = 0;
+    let taxTotal = 0;
+
+    items.forEach(item => {
+      const lineTotal = item.qty * item.price;
+      subtotal += lineTotal;
+
+      const itemTax = lineTotal * (item.taxRate / 100);
+      taxTotal += itemTax;
+    });
+
+    let discountTotal = 0;
+    if (discountType === 'percent') {
+      discountTotal = subtotal * (discountValue / 100);
+    } else {
+      discountTotal = Math.min(discountValue, subtotal);
+    }
+
+    let grandTotal = 0;
+    if (taxMode === 'excluded') {
+      grandTotal = subtotal + taxTotal - discountTotal + Number(shippingCharge || 0);
+    } else {
+      // Taxes included in the item prices
+      grandTotal = subtotal - discountTotal + Number(shippingCharge || 0);
+    }
+
+    return {
+      subtotal: Math.max(0, subtotal),
+      taxTotal: Math.max(0, taxTotal),
+      discountTotal: Math.max(0, discountTotal),
+      grandTotal: Math.max(0, grandTotal),
+    };
+  }, [items, taxMode, discountType, discountValue, shippingCharge]);
+
+  // Handle local storage synchronization & persistence
+  useEffect(() => {
+    const cachedData = localStorage.getItem('invoice_desk_draft');
+    if (cachedData) {
+      try {
+        const parsed = JSON.parse(cachedData);
+        setBusinessName(parsed.businessName || 'My Business Corp');
+        setBusinessAddress(parsed.businessAddress || '');
+        setBusinessPhone(parsed.businessPhone || '');
+        setBusinessEmail(parsed.businessEmail || '');
+        setBusinessWebsite(parsed.businessWebsite || '');
+        setBusinessTaxId(parsed.businessTaxId || '');
+        setBusinessLogo(parsed.businessLogo || '');
+        setCustomerName(parsed.customerName || 'Acme Corporation');
+        setCustomerAddress(parsed.customerAddress || '');
+        setCustomerEmail(parsed.customerEmail || '');
+        setCustomerPhone(parsed.customerPhone || '');
+        setInvoiceNumber(parsed.invoiceNumber || '');
+        setIssueDate(parsed.issueDate || '');
+        setDueDate(parsed.dueDate || '');
+        setCurrencyCode(parsed.currencyCode || 'USD');
+        setPaymentTerms(parsed.paymentTerms || 'Net 30 Days');
+        setItems(parsed.items || []);
+        setTaxMode(parsed.taxMode || 'excluded');
+        setDiscountType(parsed.discountType || 'percent');
+        setDiscountValue(parsed.discountValue || 0);
+        setShippingCharge(parsed.shippingCharge || 0);
+        setNotes(parsed.notes || '');
+        setSignatureImage(parsed.signatureImage || '');
+        setSignatureType(parsed.signatureType || 'draw');
+        setSignatureText(parsed.signatureText || 'Authorized Manager');
+      } catch (e) {
+        console.error('Failed restoring invoice cache', e);
+      }
+    }
+  }, []);
+
+  const saveToLocalStorage = () => {
+    const payload = {
+      businessName, businessAddress, businessPhone, businessEmail, businessWebsite, businessTaxId, businessLogo,
+      customerName, customerAddress, customerEmail, customerPhone,
+      invoiceNumber, issueDate, dueDate, currencyCode, paymentTerms,
+      items, taxMode, discountType, discountValue, shippingCharge, notes,
+      signatureImage, signatureType, signatureText
+    };
+    localStorage.setItem('invoice_desk_draft', JSON.stringify(payload));
+  };
+
+  useEffect(() => {
+    saveToLocalStorage();
+  }, [
+    businessName, businessAddress, businessPhone, businessEmail, businessWebsite, businessTaxId, businessLogo,
+    customerName, customerAddress, customerEmail, customerPhone,
+    invoiceNumber, issueDate, dueDate, currencyCode, paymentTerms,
+    items, taxMode, discountType, discountValue, shippingCharge, notes,
+    signatureImage, signatureType, signatureText
+  ]);
+
+  // Signature Canvas Drawing Logic
+  const startDrawing = (e) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#000000';
+    
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX || e.touches?.[0].clientX) - rect.left;
+    const y = (e.clientY || e.touches?.[0].clientY) - rect.top;
+    
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    setIsDrawing(true);
+  };
+
+  const draw = (e) => {
+    if (!isDrawing) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX || e.touches?.[0].clientX) - rect.left;
+    const y = (e.clientY || e.touches?.[0].clientY) - rect.top;
+    
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    e.preventDefault();
+  };
+
+  const stopDrawing = () => {
+    if (!isDrawing) return;
+    setIsDrawing(false);
+    const canvas = canvasRef.current;
+    if (canvas) {
+      setSignatureImage(canvas.toDataURL());
+    }
+  };
+
+  const clearCanvas = () => {
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      setSignatureImage('');
+    }
+  };
+
+  // Image Upload helpers
+  const handleLogoUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setBusinessLogo(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSignatureUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSignatureImage(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Row operations
+  const handleAddItem = () => {
+    const newId = items.length > 0 ? Math.max(...items.map(i => i.id)) + 1 : 1;
+    setItems([...items, { id: newId, name: '', description: '', qty: 1, price: 0, taxRate: 0 }]);
+  };
+
+  const handleUpdateItem = (id, field, value) => {
+    setItems(items.map(item => {
+      if (item.id === id) {
+        let processedValue = value;
+        if (field === 'qty' || field === 'price' || field === 'taxRate') {
+          processedValue = value === '' ? '' : Number(value);
+        }
+        return { ...item, [field]: processedValue };
+      }
+      return item;
+    }));
+  };
+
+  const handleRemoveItem = (id) => {
+    setItems(items.filter(item => item.id !== id));
+  };
+
+  const handleDuplicateItem = (item) => {
+    const newId = items.length > 0 ? Math.max(...items.map(i => i.id)) + 1 : 1;
+    setItems([...items, { ...item, id: newId }]);
+  };
+
+  // Actions
+  const handleReset = () => {
+    if (window.confirm('Are you sure you want to reset all data? This will clear the current invoice.')) {
+      setBusinessName('My Business Corp');
+      setBusinessAddress('123 Enterprise Way, Suite 500, Tech City');
+      setBusinessPhone('+1 (555) 019-2834');
+      setBusinessEmail('billing@mybusiness.com');
+      setBusinessWebsite('www.mybusiness.com');
+      setBusinessTaxId('VAT-992019348');
+      setBusinessLogo('');
+      setCustomerName('');
+      setCustomerAddress('');
+      setCustomerEmail('');
+      setCustomerPhone('');
+      setInvoiceNumber(`INV-${Date.now().toString().slice(-6)}`);
+      setIssueDate(new Date().toISOString().split('T')[0]);
+      setDueDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+      setCurrencyCode('USD');
+      setPaymentTerms('Net 30 Days');
+      setItems([{ id: 1, name: '', description: '', qty: 1, price: 0, taxRate: 0 }]);
+      setTaxMode('excluded');
+      setDiscountType('percent');
+      setDiscountValue(0);
+      setShippingCharge(0);
+      setNotes('');
+      setSignatureImage('');
+      showToast('Invoice details reset successful.');
+    }
+  };
+
+  const showToast = (msg) => {
+    setSuccessToast(msg);
+    setTimeout(() => setSuccessToast(''), 3500);
+  };
+
+  const handleCopyInvoice = () => {
+    navigator.clipboard.writeText(JSON.stringify({
+      businessName, businessAddress, businessPhone, businessEmail, businessWebsite, businessTaxId,
+      customerName, customerAddress, customerEmail, customerPhone,
+      invoiceNumber: `${invoiceNumber}-COPY`, issueDate, dueDate, currencyCode, paymentTerms,
+      items, taxMode, discountType, discountValue, shippingCharge, notes, signatureImage, signatureType, signatureText
+    }, null, 2));
+    showToast('Invoice configuration copied to clipboard!');
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  // SEO Schema Markup injection
+  useEffect(() => {
+    const structuredData = {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Invoice Desk",
+      "operatingSystem": "All",
+      "applicationCategory": "BusinessApplication",
+      "offers": {
+        "@type": "Offer",
+        "price": "0.00",
+        "priceCurrency": "USD"
+      },
+      "featureList": [
+        "10 Free Professional Invoice Templates",
+        "Client-side PDF & Image generation",
+        "Secure automatic offline storage",
+        "Dynamic VAT/GST calculation mechanics",
+        "Built-in Signature pad"
+      ]
+    };
+    const script = document.createElement('script');
+    script.type = 'application/ld+json';
+    script.innerHTML = JSON.stringify(structuredData);
+    document.head.appendChild(script);
+    return () => {
+      document.head.removeChild(script);
+    };
+  }, []);
+
+  return (
+    <div className={`min-h-screen transition-colors duration-200 ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'}`}>
+      
+      {/* Toast Alert */}
+      {successToast && (
+        <div className="fixed top-5 right-5 z-50 flex items-center bg-emerald-600 text-white px-5 py-3 rounded-xl shadow-2xl animate-bounce">
+          <Icons.Check />
+          <span>{successToast}</span>
+        </div>
+      )}
+
+      {/* HEADER SECTION */}
+      <header className="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 sticky top-0 z-40 transition-colors duration-200 print:hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          
+          {/* Logo / Tagline */}
+          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setActiveTab('home')}>
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-sky-500 flex items-center justify-center text-white font-extrabold text-xl shadow-lg shadow-indigo-500/20">
+              ID
+            </div>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">Invoice Desk</h1>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Professional PDF Invoice Generator</p>
+            </div>
+          </div>
+
+          {/* Navigation Items */}
+          <nav className="hidden md:flex space-x-8 text-sm font-semibold text-slate-600 dark:text-slate-300">
+            <button onClick={() => { setActiveTab('home'); setPreviewMode(false); }} className={`hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors ${activeTab === 'home' ? 'text-indigo-600 dark:text-indigo-400' : ''}`}>Home</button>
+            <button onClick={() => setActiveTab('privacy')} className={`hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors ${activeTab === 'privacy' ? 'text-indigo-600 dark:text-indigo-400' : ''}`}>Privacy Policy</button>
+            <button onClick={() => setActiveTab('terms')} className={`hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors ${activeTab === 'terms' ? 'text-indigo-600 dark:text-indigo-400' : ''}`}>Terms &amp; Conditions</button>
+            <button onClick={() => setActiveTab('disclaimer')} className={`hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors ${activeTab === 'disclaimer' ? 'text-indigo-600 dark:text-indigo-400' : ''}`}>Disclaimer</button>
+            <button onClick={() => setActiveTab('contact')} className={`hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors ${activeTab === 'contact' ? 'text-indigo-600 dark:text-indigo-400' : ''}`}>Contact Us</button>
+          </nav>
+
+          {/* Settings / Mode switches */}
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={() => setDarkMode(!darkMode)}
+              className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:ring-2 hover:ring-indigo-500/50 transition-all"
+              aria-label="Toggle Dark Mode"
+            >
+              {darkMode ? <Icons.Sun /> : <Icons.Moon />}
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* AD PLACEMENT AREA: TOP BANNER */}
+      <div className="max-w-7xl mx-auto px-4 mt-6 print:hidden">
+        <div className="bg-gradient-to-r from-slate-100 to-slate-200 dark:from-slate-900 dark:to-slate-800 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 text-center">
+          <span className="text-[10px] tracking-widest text-slate-400 dark:text-slate-500 block uppercase mb-1">Sponsored Advertisement</span>
+          <div className="h-24 flex items-center justify-center text-slate-500 text-sm font-medium">
+            Google AdSense Responsive Banner Block (Auto-sizing display ad)
+          </div>
+        </div>
+      </div>
+
+      {/* MAIN CONTAINER (Left Sidebar Ad, Main workspace, Right Sidebar Ad) */}
+      <main className="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        {/* LEFT ADVERTISING COLUMN */}
+        <aside className="hidden lg:block lg:col-span-2 print:hidden">
+          <div className="sticky top-24 bg-gradient-to-b from-slate-100 to-slate-200 dark:from-slate-900 dark:to-slate-800 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 text-center h-[600px] flex flex-col justify-between">
+            <span className="text-[9px] tracking-widest text-slate-400 dark:text-slate-500 uppercase block">Ad Space</span>
+            <div className="text-slate-500 text-xs font-semibold my-auto">
+              Responsive Left Sidebar Column Ad Area
+            </div>
+            <span className="text-[9px] text-slate-400 dark:text-slate-500 block">300 x 600 / Responsive</span>
+          </div>
+        </aside>
+
+        {/* WORKSPACE & CONTENT */}
+        <section className="col-span-11 lg:col-span-8 print:col-span-12">
+          {activeTab === 'home' && (
+            <div className="space-y-8">
+              
+              {/* Toolbar/Top bar controls */}
+              <div className="flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-sm border border-slate-200/60 dark:border-slate-800/80 print:hidden">
+                <div className="flex items-center space-x-3 overflow-x-auto py-1 scrollbar-none">
+                  <button 
+                    onClick={() => setPreviewMode(!previewMode)}
+                    className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center transition-all ${previewMode ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'}`}
+                  >
+                    <Icons.Eye />
+                    {previewMode ? 'Edit Mode' : 'Preview Mode'}
+                  </button>
+                  <button onClick={handlePrint} className="bg-indigo-600 text-white hover:bg-indigo-700 px-4 py-2 rounded-xl text-sm font-bold flex items-center transition-all">
+                    <Icons.Print /> Print/Download PDF
+                  </button>
+                  <button onClick={handleReset} className="bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/40 px-4 py-2 rounded-xl text-sm font-bold flex items-center transition-all">
+                    <Icons.Refresh /> Reset
+                  </button>
+                  <button onClick={handleCopyInvoice} className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-xl text-sm font-bold flex items-center transition-all">
+                    <Icons.Duplicate /> Clone Config
+                  </button>
+                </div>
+              </div>
+
+              {/* Template Selectors */}
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-200/60 dark:border-slate-800/80 print:hidden">
+                <h3 className="text-sm font-semibold mb-3 text-slate-400 dark:text-slate-500 uppercase tracking-widest">Select Invoice Template Style (10 Available)</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  {TEMPLATES.map((tmpl) => (
+                    <button
+                      key={tmpl.id}
+                      onClick={() => setCurrentTemplate(tmpl.id)}
+                      className={`px-3 py-2 rounded-xl border text-xs font-bold transition-all truncate text-left ${currentTemplate === tmpl.id ? 'border-indigo-600 bg-indigo-50/55 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300' : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                    >
+                      <span className={`inline-block w-2.5 h-2.5 rounded-full mr-2 ${tmpl.accent}`}></span>
+                      {tmpl.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* TWO COLUMN WORKSPACE (EDITING LEFT / REALTIME INVOICE SHEET RIGHT) */}
+              <div className="grid grid-cols-1 gap-8">
+                
+                {/* 1. EDITING CONTROLS (Only visible in edit mode) */}
+                {!previewMode && (
+                  <div className="bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-3xl shadow-sm border border-slate-200/60 dark:border-slate-800/80 space-y-8 print:hidden">
+                    
+                    {/* A. Business Information */}
+                    <div>
+                      <h3 className="text-lg font-bold border-b border-slate-100 dark:border-slate-800 pb-3 mb-5 text-slate-900 dark:text-white flex items-center">
+                        <span className="w-1.5 h-5 bg-indigo-600 rounded mr-2"></span> Business Details (Seller)
+                      </h3>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 mb-1 uppercase">Business/Company Name</label>
+                          <input type="text" value={businessName} onChange={(e) => setBusinessName(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm dark:text-white" placeholder="E.g., GlobalTech Ltd" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 mb-1 uppercase">Tax / VAT Reference Number</label>
+                          <input type="text" value={businessTaxId} onChange={(e) => setBusinessTaxId(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm dark:text-white" placeholder="E.g., GB-1234567" />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 mb-1 uppercase">Full Business Address</label>
+                          <textarea value={businessAddress} onChange={(e) => setBusinessAddress(e.target.value)} rows="2" className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm dark:text-white" placeholder="Line 1, State, Country, Postal Code" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 mb-1 uppercase">Contact Email</label>
+                          <input type="email" value={businessEmail} onChange={(e) => setBusinessEmail(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm dark:text-white" placeholder="billing@mycorp.com" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 mb-1 uppercase">Contact Phone</label>
+                          <input type="text" value={businessPhone} onChange={(e) => setBusinessPhone(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm dark:text-white" placeholder="+1 (555) 123-4567" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 mb-1 uppercase">Website Address</label>
+                          <input type="text" value={businessWebsite} onChange={(e) => setBusinessWebsite(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm dark:text-white" placeholder="www.mycorp.com" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 mb-1 uppercase">Upload Company Logo</label>
+                          <div className="relative flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-800 hover:border-indigo-500 rounded-xl py-3 px-4 bg-slate-50 dark:bg-slate-800/30 transition-all cursor-pointer">
+                            <input type="file" accept="image/*" onChange={handleLogoUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Select Image (PNG, JPG)</span>
+                          </div>
+                          {businessLogo && (
+                            <button onClick={() => setBusinessLogo('')} className="mt-2 text-[11px] text-rose-500 hover:underline block font-semibold">Remove logo</button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* B. Customer Information */}
+                    <div>
+                      <h3 className="text-lg font-bold border-b border-slate-100 dark:border-slate-800 pb-3 mb-5 text-slate-900 dark:text-white flex items-center">
+                        <span className="w-1.5 h-5 bg-indigo-600 rounded mr-2"></span> Customer / Client Details
+                      </h3>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 mb-1 uppercase">Client Name</label>
+                          <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm dark:text-white" placeholder="Acme Inc." />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 mb-1 uppercase">Client Contact Email</label>
+                          <input type="email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm dark:text-white" placeholder="procurement@acme.com" />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 mb-1 uppercase">Client Address</label>
+                          <textarea value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} rows="2" className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm dark:text-white" placeholder="Company Headquarters, Suite 20" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 mb-1 uppercase">Client Phone</label>
+                          <input type="text" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm dark:text-white" placeholder="+1 (415) 555-9012" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* C. Invoice Information */}
+                    <div>
+                      <h3 className="text-lg font-bold border-b border-slate-100 dark:border-slate-800 pb-3 mb-5 text-slate-900 dark:text-white flex items-center">
+                        <span className="w-1.5 h-5 bg-indigo-600 rounded mr-2"></span> Invoice Reference &amp; Dates
+                      </h3>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 mb-1 uppercase">Invoice Number</label>
+                          <input type="text" value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm dark:text-white font-mono" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 mb-1 uppercase">Issue Date</label>
+                          <input type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm dark:text-white" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 mb-1 uppercase">Due Date</label>
+                          <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm dark:text-white" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 mb-1 uppercase">Currency</label>
+                          <select value={currencyCode} onChange={(e) => setCurrencyCode(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm dark:text-white font-medium">
+                            {CURRENCIES.map((curr) => (
+                              <option key={curr.code} value={curr.code}>{curr.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 mb-1 uppercase">Payment Terms</label>
+                          <input type="text" value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm dark:text-white" placeholder="Net 30 / Payment on receipt" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* D. Item Management */}
+                    <div>
+                      <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3 mb-5">
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center">
+                          <span className="w-1.5 h-5 bg-indigo-600 rounded mr-2"></span> Line Items
+                        </h3>
+                        <button onClick={handleAddItem} className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3.5 py-2 rounded-xl flex items-center font-bold transition-all shadow-md shadow-indigo-500/10">
+                          <Icons.Plus /> <span className="ml-1">Add Item</span>
+                        </button>
+                      </div>
+
+                      <div className="space-y-4">
+                        {items.map((item, index) => (
+                          <div key={item.id} className="p-4 bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-800 rounded-2xl relative space-y-3">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-slate-500">Item #{index + 1}</span>
+                              <div className="flex space-x-2">
+                                <button onClick={() => handleDuplicateItem(item)} className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-white dark:hover:bg-slate-800 rounded-lg transition-all" title="Duplicate Item">
+                                  <Icons.Duplicate />
+                                </button>
+                                <button onClick={() => handleRemoveItem(item.id)} className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-white dark:hover:bg-slate-800 rounded-lg transition-all" title="Remove Item">
+                                  <Icons.Trash />
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                              <div className="md:col-span-4">
+                                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Title / Product</label>
+                                <input type="text" value={item.name} onChange={(e) => handleUpdateItem(item.id, 'name', e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-lg text-sm dark:text-white" placeholder="Product name or Service" />
+                              </div>
+                              <div className="md:col-span-4">
+                                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Details / Description</label>
+                                <input type="text" value={item.description} onChange={(e) => handleUpdateItem(item.id, 'description', e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-lg text-sm dark:text-white" placeholder="Details of this item" />
+                              </div>
+                              <div className="md:col-span-1">
+                                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Qty</label>
+                                <input type="number" min="0" step="any" value={item.qty} onChange={(e) => handleUpdateItem(item.id, 'qty', e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-lg text-sm text-center dark:text-white" />
+                              </div>
+                              <div className="md:col-span-2">
+                                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Unit Price</label>
+                                <input type="number" min="0" step="any" value={item.price} onChange={(e) => handleUpdateItem(item.id, 'price', e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-lg text-sm dark:text-white" />
+                              </div>
+                              <div className="md:col-span-1">
+                                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-0.5">Tax %</label>
+                                <input type="number" min="0" step="any" value={item.taxRate} onChange={(e) => handleUpdateItem(item.id, 'taxRate', e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-lg text-sm text-center dark:text-white" />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* E. Tax & Discount Setup */}
+                    <div>
+                      <h3 className="text-lg font-bold border-b border-slate-100 dark:border-slate-800 pb-3 mb-5 text-slate-900 dark:text-white flex items-center">
+                        <span className="w-1.5 h-5 bg-indigo-600 rounded mr-2"></span> Taxes, Discounts &amp; Extra Costs
+                      </h3>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 mb-1 uppercase">Tax Computation Mode</label>
+                          <select value={taxMode} onChange={(e) => setTaxMode(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm dark:text-white">
+                            <option value="excluded">Tax Excluded (Added to subtotal)</option>
+                            <option value="included">Tax Included (Included in base prices)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 mb-1 uppercase">Discount Type</label>
+                          <select value={discountType} onChange={(e) => setDiscountType(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm dark:text-white">
+                            <option value="percent">Percentage (%)</option>
+                            <option value="fixed">Fixed Flat Amount</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 mb-1 uppercase">Discount Value</label>
+                          <input type="number" min="0" step="any" value={discountValue} onChange={(e) => setDiscountValue(Number(e.target.value))} className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm dark:text-white" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 mb-1 uppercase">Shipping / Logistics Fees</label>
+                          <input type="number" min="0" step="any" value={shippingCharge} onChange={(e) => setShippingCharge(Number(e.target.value))} className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-indigo-500/50 outline-none text-sm dark:text-white" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* F. Signature & Bottom Section */}
+                    <div>
+                      <h3 className="text-lg font-bold border-b border-slate-100 dark:border-slate-800 pb-3 mb-5 text-slate-900 dark:text-white flex items-center">
+                        <span className="w-1.5 h-5 bg-indigo-600 rounded mr-2"></span> Custom Signature Panel
+                      </h3>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 mb-2 uppercase">Signature Input Method</label>
+                            <div className="grid grid-cols-3 gap-2">
+                              {['draw', 'upload', 'text'].map((type) => (
+                                <button
+                                  key={type}
+                                  type="button"
+                                  onClick={() => setSignatureType(type)}
+                                  className={`px-3 py-2 rounded-xl text-xs font-bold border capitalize transition-all ${signatureType === type ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300' : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'}`}
+                                >
+                                  {type}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {signatureType === 'text' && (
+                            <div>
+                              <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 mb-1 uppercase">Signature Text</label>
+                              <input type="text" value={signatureText} onChange={(e) => setSignatureText(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 rounded-xl text-sm dark:text-white" />
+                            </div>
+                          )}
+
+                          {signatureType === 'upload' && (
+                            <div>
+                              <label className="block text-xs font-bold text-slate-400 dark:text-slate-500 mb-1 uppercase">Upload Image</label>
+                              <div className="relative flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl py-3 px-4 bg-slate-50 dark:bg-slate-800/30 transition-all cursor-pointer">
+                                <input type="file" accept="image/*" onChange={handleSignatureUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Upload Signature PNG/JPG</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {signatureType === 'draw' && (
+                          <div className="border border-slate-200 dark:border-slate-800 rounded-2xl p-4 bg-slate-50 dark:bg-slate-800/20">
+                            <div className="flex justify-between items-center mb-2">
+                              <label className="block text-xs font-bold text-slate-400 uppercase">Draw Signature Area</label>
+                              <button onClick={clearCanvas} className="text-xs text-rose-500 hover:underline font-semibold">Clear Area</button>
+                            </div>
+                            <canvas
+                              ref={canvasRef}
+                              width={320}
+                              height={120}
+                              className="bg-white border border-slate-200 dark:border-slate-700 rounded-xl w-full h-[120px] touch-none cursor-crosshair"
+                              onMouseDown={startDrawing}
+                              onMouseMove={draw}
+                              onMouseUp={stopDrawing}
+                              onMouseLeave={stopDrawing}
+                              onTouchStart={startDrawing}
+                              onTouchMove={draw}
+                              onTouchEnd={stopDrawing}
+                            />
+                            <p className="text-[10px] text-slate-400 mt-2 text-center">Use your mouse or finger inside the box above to generate signature.</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                  </div>
+                )}
+
+                {/* 2. REALTIME INVOICE SHEET VIEW */}
+                <div id="invoice-sheet" className={`bg-white dark:bg-slate-900 shadow-2xl rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 mx-auto w-full max-w-[950px] print:shadow-none print:border-none print:rounded-none transition-colors duration-200`}>
+                  
+                  {/* Visual Accent Top Bar */}
+                  <div className={`h-3 w-full ${TEMPLATES.find(t => t.id === currentTemplate)?.accent}`}></div>
+
+                  <div className={`p-8 sm:p-12 space-y-8 ${TEMPLATES.find(t => t.id === currentTemplate)?.bg} ${TEMPLATES.find(t => t.id === currentTemplate)?.font || 'font-sans'}`}>
+                    
+                    {/* Invoice Header Rows */}
+                    <div className="flex flex-col md:flex-row justify-between items-start gap-6 border-b border-slate-200/60 dark:border-slate-700/60 pb-8">
+                      <div className="space-y-4 max-w-lg">
+                        {businessLogo ? (
+                          <img src={businessLogo} alt="Logo" className="max-h-16 max-w-[200px] object-contain rounded-lg" />
+                        ) : (
+                          <div className="h-12 w-12 rounded-xl bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-600 dark:text-slate-400 print:hidden text-xs">No Logo</div>
+                        )}
+                        <div>
+                          <h2 className="text-2xl font-black text-slate-900 dark:text-white leading-tight">{businessName}</h2>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 whitespace-pre-line mt-2 leading-relaxed">{businessAddress}</p>
+                          {businessTaxId && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-mono"><strong className="text-slate-700 dark:text-slate-300">Tax ID:</strong> {businessTaxId}</p>}
+                        </div>
+                      </div>
+
+                      <div className="text-left md:text-right space-y-2 self-stretch md:self-auto flex flex-col justify-between">
+                        <div>
+                          <h1 className="text-4xl font-extrabold uppercase tracking-tight text-slate-900 dark:text-white">Invoice</h1>
+                          <p className="text-sm font-mono font-bold text-indigo-600 dark:text-indigo-400 mt-1">{invoiceNumber}</p>
+                        </div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 space-y-1">
+                          <p><strong>Issue Date:</strong> {issueDate}</p>
+                          <p><strong>Due Date:</strong> {dueDate}</p>
+                          {paymentTerms && <p><strong>Terms:</strong> {paymentTerms}</p>}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Customer & Sender Columns */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 border-b border-slate-200/60 dark:border-slate-700/60 pb-8">
+                      <div>
+                        <span className="text-[10px] tracking-widest text-slate-400 uppercase font-bold block mb-2">Billed To:</span>
+                        <h3 className="text-base font-bold text-slate-900 dark:text-white">{customerName || 'No Client Name Specified'}</h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 whitespace-pre-line mt-1.5 leading-relaxed">{customerAddress || 'No Client Address Specified'}</p>
+                        {customerEmail && <p className="text-xs text-slate-500 dark:text-slate-400 mt-2"><strong>Email:</strong> {customerEmail}</p>}
+                        {customerPhone && <p className="text-xs text-slate-500 dark:text-slate-400"><strong>Phone:</strong> {customerPhone}</p>}
+                      </div>
+                      
+                      <div className="md:text-right flex flex-col justify-end">
+                        <span className="text-[10px] tracking-widest text-slate-400 uppercase font-bold block mb-2 md:hidden">Business Contact:</span>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 space-y-1">
+                          {businessEmail && <p><strong>Email:</strong> {businessEmail}</p>}
+                          {businessPhone && <p><strong>Phone:</strong> {businessPhone}</p>}
+                          {businessWebsite && <p><strong>Web:</strong> {businessWebsite}</p>}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Invoice items Table */}
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-slate-200 dark:border-slate-700 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                            <th className="py-3 w-1/12">#</th>
+                            <th className="py-3 w-5/12">Item Description</th>
+                            <th className="py-3 w-2/12 text-center">Quantity</th>
+                            <th className="py-3 w-2/12 text-right font-medium">Unit Price</th>
+                            <th className="py-3 w-2/12 text-right">Line Total</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+                          {items.length === 0 ? (
+                            <tr>
+                              <td colSpan="5" className="py-8 text-center text-slate-400 font-medium">No items present. Add some line items above.</td>
+                            </tr>
+                          ) : (
+                            items.map((item, index) => (
+                              <tr key={item.id} className="align-top">
+                                <td className="py-4 text-slate-400 font-mono">{index + 1}</td>
+                                <td className="py-4 pr-4">
+                                  <div className="font-bold text-slate-900 dark:text-white">{item.name || 'Untitled Product'}</div>
+                                  {item.description && <p className="text-slate-500 dark:text-slate-400 text-[11px] mt-0.5 leading-relaxed">{item.description}</p>}
+                                </td>
+                                <td className="py-4 text-center text-slate-700 dark:text-slate-300 font-mono">{item.qty || 0}</td>
+                                <td className="py-4 text-right text-slate-700 dark:text-slate-300 font-mono">{currencySymbol}{(item.price || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                <td className="py-4 text-right font-bold text-slate-900 dark:text-white font-mono">{currencySymbol}{((item.qty || 0) * (item.price || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Summary Math Block */}
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-8 border-t border-slate-200/60 dark:border-slate-700/60 pt-8">
+                      
+                      {/* Left space: Signature / Terms Display */}
+                      <div className="md:col-span-7 space-y-6">
+                        {/* Rendering Signature elements */}
+                        {signatureType === 'text' && signatureText && (
+                          <div className="pt-4 border-t border-dashed border-slate-200 dark:border-slate-800 inline-block">
+                            <p className="font-serif italic text-lg text-indigo-600 dark:text-indigo-400 mb-0.5">{signatureText}</p>
+                            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest block">Authorized Signatory</span>
+                          </div>
+                        )}
+
+                        {signatureType === 'upload' && signatureImage && (
+                          <div className="pt-4 inline-block">
+                            <img src={signatureImage} alt="Signature" className="max-h-12 max-w-[200px] object-contain rounded mb-1" />
+                            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest block">Authorized Signatory</span>
+                          </div>
+                        )}
+
+                        {signatureType === 'draw' && signatureImage && (
+                          <div className="pt-4 inline-block">
+                            <img src={signatureImage} alt="Draw Signature" className="max-h-12 max-w-[200px] object-contain mb-1" />
+                            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest block">Authorized Signatory</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Right space: Calculation Outputs */}
+                      <div className="md:col-span-5 bg-slate-50/50 dark:bg-slate-800/20 rounded-2xl p-6 border border-slate-200/30 dark:border-slate-800/30">
+                        <div className="space-y-3.5 text-xs">
+                          <div className="flex justify-between items-center text-slate-500 dark:text-slate-400">
+                            <span>Subtotal</span>
+                            <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{currencySymbol}{calculations.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          </div>
+
+                          {calculations.discountTotal > 0 && (
+                            <div className="flex justify-between items-center text-emerald-600 dark:text-emerald-400 font-medium">
+                              <span>Discount {discountType === 'percent' ? `(${discountValue}%)` : ''}</span>
+                              <span className="font-mono font-bold">-{currencySymbol}{calculations.discountTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            </div>
+                          )}
+
+                          {taxMode === 'excluded' && calculations.taxTotal > 0 && (
+                            <div className="flex justify-between items-center text-slate-500 dark:text-slate-400">
+                              <span>VAT/GST Taxes Total</span>
+                              <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{currencySymbol}{calculations.taxTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            </div>
+                          )}
+
+                          {taxMode === 'included' && calculations.taxTotal > 0 && (
+                            <div className="flex justify-between items-center text-slate-400">
+                              <span className="italic">Includes Taxes Total</span>
+                              <span className="font-mono italic font-medium">{currencySymbol}{calculations.taxTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            </div>
+                          )}
+
+                          {shippingCharge > 0 && (
+                            <div className="flex justify-between items-center text-slate-500 dark:text-slate-400">
+                              <span>Shipping &amp; Logistics</span>
+                              <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{currencySymbol}{Number(shippingCharge).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            </div>
+                          )}
+
+                          <div className={`pt-3 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center text-base font-extrabold ${TEMPLATES.find(t => t.id === currentTemplate)?.primary}`}>
+                            <span>Total Amount Due</span>
+                            <span className="font-mono">{currencySymbol}{calculations.grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                    </div>
+
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+          )}
+
+          {/* PRIVACY POLICY PAGE */}
+          {activeTab === 'privacy' && (
+            <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-sm border border-slate-200/60 dark:border-slate-800/80 space-y-6">
+              <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white">Privacy Policy</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Effective Date: July 7, 2026</p>
+              
+              <div className="space-y-4 text-slate-600 dark:text-slate-300 text-sm leading-relaxed">
+                <p>Welcome to Invoice Desk. We values your privacy. We want you to understand that all invoice generation, data structures, and signatures are processed exclusively client-side (inside your browser window). No financial transaction data is sent to our servers.</p>
+                
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white mt-4">1. Information We Do Not Collect</h3>
+                <p>Because the Tool functions locally in your client environment, we do not monitor, store, or receive your business information, customer addresses, invoice logs, financial summaries, or uploaded business logos. All computations take place entirely via JavaScript on your system.</p>
+
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white mt-4">2. Cookies &amp; Local Storage</h3>
+                <p>We use local storage (LocalStorage) in your web browser strictly to auto-save drafts of your current invoice setup. This allows you to close your window and continue working later. You can clear this draft immediately at any time by pressing the Reset option inside our tool interface.</p>
+
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white mt-4">3. Third-Party Advertising &amp; Google AdSense</h3>
+                <p>This website runs advertisements via Google AdSense. Google and third-party vendors use cookies to serve ads based on a user's prior visits to this website or other web resources. You can opt out of personalized advertising by visiting Google's Ads Settings.</p>
+              </div>
+              
+              <button onClick={() => setActiveTab('home')} className="mt-6 inline-block bg-indigo-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold">Return to Invoice Generator</button>
+            </div>
+          )}
+
+          {/* TERMS & CONDITIONS */}
+          {activeTab === 'terms' && (
+            <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-sm border border-slate-200/60 dark:border-slate-800/80 space-y-6">
+              <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white">Terms &amp; Conditions</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Effective Date: July 7, 2026</p>
+              
+              <div className="space-y-4 text-slate-600 dark:text-slate-300 text-sm leading-relaxed">
+                <p>Please review our Terms and Conditions before utilizing the Invoice Desk invoice generator tools.</p>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white mt-4">1. License of Use</h3>
+                <p>Invoice Desk grants you a free, non-exclusive license to use this online tool to construct, customize, print, and download PDF or printable invoice copies for your commercial, consulting, corporate, or freelance transactions.</p>
+                
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white mt-4">2. Accuracy and Responsibility</h3>
+                <p>You assume complete accountability for verifying the numerical mathematical calculations, tax exclusions/inclusions, invoice prefixes, compliance details, and overall correctness of any invoice exported using this platform.</p>
+
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white mt-4">3. No Warranties</h3>
+                <p>The system is provided "AS IS", without any guarantees or financial warranties of any kind. We assume no legal responsibility for outstanding transaction errors, contract breaches, or compliance liabilities that arise due to the document created.</p>
+              </div>
+
+              <button onClick={() => setActiveTab('home')} className="mt-6 inline-block bg-indigo-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold">Return to Invoice Generator</button>
+            </div>
+          )}
+
+          {/* DISCLAIMER PAGE */}
+          {activeTab === 'disclaimer' && (
+            <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-sm border border-slate-200/60 dark:border-slate-800/80 space-y-6">
+              <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white">Financial &amp; Legal Disclaimer</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Effective Date: July 7, 2026</p>
+              
+              <div className="space-y-4 text-slate-600 dark:text-slate-300 text-sm leading-relaxed">
+                <p>The information, tools, calculations, templates, and currency structures offered by **Invoice Desk** are meant strictly for business organizational tasks. We do not provide qualified legal, audit, financial advisory, bookkeeping, or tax declaration advice.</p>
+                <p>Your local country may require specific structural declarations, standard reporting models, digital electronic bookkeeping certifications (like SAF-T, Peppol, e-invoicing laws, etc.), or strict VAT rates. Consult a chartered accountant to ensure your outgoing invoice documents meet standard regional policies.</p>
+              </div>
+
+              <button onClick={() => setActiveTab('home')} className="mt-6 inline-block bg-indigo-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold">Return to Invoice Generator</button>
+            </div>
+          )}
+
+          {/* CONTACT US */}
+          {activeTab === 'contact' && (
+            <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-sm border border-slate-200/60 dark:border-slate-800/80 space-y-6">
+              <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white">Contact Invoice Desk</h2>
+              <p className="text-slate-600 dark:text-slate-300 text-sm">Have feedback, suggestions, custom template requests, or advertising inquiries? Reach out to our dedicated team below.</p>
+              
+              <form onSubmit={(e) => { e.preventDefault(); showToast("Message sent successfully! We will contact you soon."); }} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 mb-1 uppercase">Full Name</label>
+                  <input type="text" required className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500" placeholder="E.g., David Miller" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 mb-1 uppercase">Email Address</label>
+                  <input type="email" required className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500" placeholder="david@company.com" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 mb-1 uppercase">Subject</label>
+                  <input type="text" required className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Template feature request" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 mb-1 uppercase">Your Message</label>
+                  <textarea rows="4" required className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Tell us how we can assist you..." />
+                </div>
+                <button type="submit" className="bg-indigo-600 text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/25">Send Message</button>
+              </form>
+            </div>
+          )}
+
+          {/* IN-DEPTH INFORMATIONAL SEO SECTIONS */}
+          {activeTab === 'home' && (
+            <div className="mt-16 space-y-16 border-t border-slate-200 dark:border-slate-800 pt-16 print:hidden">
+              
+              {/* ARTICLE 1: What is an invoice generator */}
+              <article className="space-y-4">
+                <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white leading-tight">
+                  What Is an <span className="text-indigo-600 dark:text-indigo-400">Invoice Generator</span>?
+                </h2>
+                <div className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed space-y-4">
+                  <p>An <strong>invoice generator</strong> is an online software tool or application that streamlines the process of billing clients. Unlike manual templates built in offline word processors or spreadsheet programs, an interactive <strong>free invoice generator</strong> automates math totals, tax inclusions, and item totals on-the-fly. This helps micro-entrepreneurs, consultants, service experts, and corporate entities prepare clear transaction papers instantly.</p>
+                  
+                  <p>Our premium web utility, <strong>Invoice Desk</strong>, functions as an advanced <strong>online invoice maker</strong> that relies entirely on client-side technology. This architecture ensures complete personal information isolation—none of your sensitive data, company records, contact figures, itemizations, or signature sketches are transmitted to outside databases. It offers a premium, modern environment to craft a fast, optimized, <strong>printable invoice</strong> format in less than 60 seconds.</p>
+                  
+                  <p>Whether you require a dedicated <strong>VAT invoice generator</strong>, a <strong>GST invoice generator</strong>, or a simple <strong>tax invoice generator</strong> for local government compliance, our tool adjusts perfectly to meet your regional billing guidelines. With 10 clean, visually appealing styles optimized for startups, corporate brands, and professional independent freelancers, managing your outstanding business receivables has never been more elegant.</p>
+                </div>
+              </article>
+
+              {/* ARTICLE 2: How to create an invoice */}
+              <article className="space-y-4">
+                <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white leading-tight">
+                  How to Create an Invoice Online?
+                </h2>
+                <div className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed space-y-4">
+                  <p>Building high-quality commercial invoices does not require complicated, expensive bookkeeping software suites. Follow these quick steps to generate, customize, and save a premium file with our modern <strong>invoice builder</strong> tool:</p>
+                  
+                  <ol className="list-decimal list-inside space-y-3 pl-2">
+                    <li>
+                      <strong>Provide Your Business Details:</strong> Fill out the seller identity block. Specify your company legal name, tax reference number, business location, website address, contact numbers, and upload your official team brand logo.
+                    </li>
+                    <li>
+                      <strong>Input Customer Information:</strong> Fill in the recipient data including full buyer organization name, accounts email, phone contacts, and physical invoicing address.
+                    </li>
+                    <li>
+                      <strong>Define Key Dates &amp; Currencies:</strong> Choose your currency unit (e.g., USD, EUR, GBP, AED, SAR, INR). Set the exact Issue Date, custom payment due dates, and payment instructions.
+                    </li>
+                    <li>
+                      <strong>Enter Your Products &amp; Line Items:</strong> Add individual lines to itemize your services. Key in title descriptions, quantities, unit valuations, and local tax rates (like VAT/GST). You can easily duplicate lines or remove unwanted products instantly.
+                    </li>
+                    <li>
+                      <strong>Apply Global Tax, Discount or Logistics Rates:</strong> Set shipping prices and determine whether taxes are included within item base costs, or calculated on top of invoice subtotals. Add a percentage or flat discount to incentivize quick payments.
+                    </li>
+                    <li>
+                      <strong>Sign the Document:</strong> Choose to write, draw, or upload a PNG signature graphic for ultimate authenticity.
+                    </li>
+                    <li>
+                      <strong>Select Your Perfect Theme:</strong> Switch between 10 gorgeous template selections such as Elegant Serif, Modern Teal, Classic Dark, or Minimalist Black. Click the "Print/Download PDF" control to trigger your system output!
+                    </li>
+                  </ol>
+                  
+                  <p>Our secure system is fully optimized as an <strong>invoice creator online</strong> solution that operates inside all modern desktop and mobile browsers, allowing you to establish a consistent, professional billing workflow without any friction.</p>
+                </div>
+              </article>
+
+              {/* ARTICLE 3: Benefits of invoice generators */}
+              <article className="space-y-4">
+                <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white leading-tight">
+                  Benefits of Using Our <span className="text-indigo-600 dark:text-indigo-400">Online Invoice Maker</span>
+                </h2>
+                <div className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed space-y-4">
+                  <p>Operating a small business, startup, or freelance career demands peak productivity. Utilizing our professional-grade <strong>invoice template</strong> utility instead of antiquated manual files provides massive strategic advantages:</p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                    <div className="bg-slate-50 dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/50 dark:border-slate-800">
+                      <h4 className="font-bold text-slate-900 dark:text-white text-base mb-2">1. Completely No-Login Required</h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">No subscriptions, logins, email submissions, or mandatory account creation. Open the page and configure your business billing details immediately.</p>
+                    </div>
+                    <div className="bg-slate-50 dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/50 dark:border-slate-800">
+                      <h4 className="font-bold text-slate-900 dark:text-white text-base mb-2">2. Secure Client-Side Engine</h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">We protect your sensitive corporate financial information by performing all mathematical operations, logo rendering, and document structures locally in your browser.</p>
+                    </div>
+                    <div className="bg-slate-50 dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/50 dark:border-slate-800">
+                      <h4 className="font-bold text-slate-900 dark:text-white text-base mb-2">3. Flexible Multi-Currency Processing</h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Generate billing summaries in USD, CAD, EUR, GBP, AED, SAR, INR, PKR, OMR, and more. Change display modes instantaneously without resetting the fields.</p>
+                    </div>
+                    <div className="bg-slate-50 dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/50 dark:border-slate-800">
+                      <h4 className="font-bold text-slate-900 dark:text-white text-base mb-2">4. 10 Premium Visual Templates</h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Present professional layouts corresponding to your business aesthetic. Choose Freelancer, Corporate, Creative gradients, or classic Slate styles with a single touch.</p>
+                    </div>
+                  </div>
+                </div>
+              </article>
+
+              {/* FAQ SECTION */}
+              <section className="space-y-6">
+                <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white leading-tight">
+                  Frequently Asked Questions (FAQs)
+                </h2>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                  
+                  <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 space-y-2">
+                    <h4 className="font-bold text-slate-900 dark:text-white">Is this invoice generator completely free?</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Yes! Invoice Desk is a completely free online invoice maker with no hidden subscriptions, trial limits, watermark fees, or premium restrictions. Generate as many transactions as you need.</p>
+                  </div>
+
+                  <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 space-y-2">
+                    <h4 className="font-bold text-slate-900 dark:text-white">Where is my transaction information stored?</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">All information is kept safe inside your browser's secure sandbox environment using LocalStorage. This means your billing figures, signature graphics, and clients' contacts remain fully private.</p>
+                  </div>
+
+                  <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 space-y-2">
+                    <h4 className="font-bold text-slate-900 dark:text-white">How do I export my invoice draft as a PDF?</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Press the "Print/Download PDF" action. This invokes the standard operating system print engine, allowing you to save the output locally as a vector PDF or output directly to physical paper.</p>
+                  </div>
+
+                  <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 space-y-2">
+                    <h4 className="font-bold text-slate-900 dark:text-white">Does the software support GST / VAT taxes?</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Yes. Our item tables let you define individual tax percentages per item. It functions smoothly as a VAT invoice generator or GST invoice generator for dynamic tax computations.</p>
+                  </div>
+
+                  <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 space-y-2">
+                    <h4 className="font-bold text-slate-900 dark:text-white">Can I change currencies?</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Yes, we support extensive currency modes, including USD, CAD, EUR, GBP, SAR, AED, INR, PKR, QAR, KWD, BHD, and OMR. Calculations and formatting apply instantly.</p>
+                  </div>
+
+                  <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 space-y-2">
+                    <h4 className="font-bold text-slate-900 dark:text-white">What formats can I upload for my company logo?</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Our uploader accepts any standard image types like PNG, JPG, JPEG, and WebP, and renders them perfectly within your custom templates.</p>
+                  </div>
+
+                  <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 space-y-2">
+                    <h4 className="font-bold text-slate-900 dark:text-white">How does the digital signature drawer work?</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Select the 'Draw' tab, then draft your signature directly inside the container utilizing your trackpad, mouse, or touch screen. It will embed instantly on the sheet.</p>
+                  </div>
+
+                  <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 space-y-2">
+                    <h4 className="font-bold text-slate-900 dark:text-white">Can I copy/duplicate line items?</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Absolutely. Every line row has quick action controls allowing you to duplicate, clone, or delete items instantly with a single button press.</p>
+                  </div>
+
+                  <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 space-y-2">
+                    <h4 className="font-bold text-slate-900 dark:text-white">Is this tool compatible with mobile phones?</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Yes. Our interface is styled using modern responsive guidelines, making invoice drafting fluid on smartphones, tablets, laptops, and wide screens alike.</p>
+                  </div>
+
+                  <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 space-y-2">
+                    <h4 className="font-bold text-slate-900 dark:text-white">Does the system support discounts?</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Yes. You can declare percentage-based discounts or flat deductions. The summary output displays total reductions and updates amounts due on the fly.</p>
+                  </div>
+
+                  <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 space-y-2">
+                    <h4 className="font-bold text-slate-900 dark:text-white">What are the available template choices?</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">We feature 10 creative styles, including Classic Professional, Minimal Black, Bold Startup, Royal Blue, Freelancer Sage, and Creative Gradient themes.</p>
+                  </div>
+
+                  <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 space-y-2">
+                    <h4 className="font-bold text-slate-900 dark:text-white">Can I clear the whole workspace at once?</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Yes. Click the "Reset" option in the control bar to instantly clear all forms, reset lines to defaults, and erase stored local drafts.</p>
+                  </div>
+
+                  <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 space-y-2">
+                    <h4 className="font-bold text-slate-900 dark:text-white">What is 'Tax Included' mode?</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">In Tax Included mode, local tax calculation assumes the unit price you entered already comprises tax. This is helpful for consumer-facing operations.</p>
+                  </div>
+
+                  <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 space-y-2">
+                    <h4 className="font-bold text-slate-900 dark:text-white">Is there an invoice limit?</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">None. You can generate unlimited corporate billing files, tax invoices, shipping logs, and quotation drafts without any hidden limitations.</p>
+                  </div>
+
+                  <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 space-y-2">
+                    <h4 className="font-bold text-slate-900 dark:text-white">Are my files legal in tax declarations?</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">Yes, our formats contain all compliance fields, including supplier info, customer info, unique invoice numbering, date logs, and detail lines needed for global audits.</p>
+                  </div>
+
+                </div>
+              </section>
+
+              {/* HIGH VOLUME SEARCH KEYWORD SECTION */}
+              <section className="bg-slate-100 dark:bg-slate-900/60 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 text-center space-y-2">
+                <span className="text-[10px] uppercase tracking-widest text-slate-400 dark:text-slate-500 font-extrabold block">Keywords Optimized Search index</span>
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-2xl mx-auto">
+                  Our system is built to search indexing expectations for queries like: 
+                  <span className="italic font-medium text-slate-600 dark:text-slate-300"> invoice generator, free invoice generator, online invoice maker, invoice template, create invoice online, business invoice generator, professional invoice maker, invoice creator, invoice builder, printable invoice, invoice pdf generator, custom invoice maker, sales invoice generator, tax invoice generator, VAT invoice generator, GST invoice generator, freelance invoice generator, small business invoice, invoice software, and invoice creator online.</span>
+                </p>
+              </section>
+
+            </div>
+          )}
+
+        </section>
+
+        {/* RIGHT ADVERTISING COLUMN */}
+        <aside className="hidden lg:block lg:col-span-2 print:hidden col-start-11">
+          <div className="sticky top-24 bg-gradient-to-b from-slate-100 to-slate-200 dark:from-slate-900 dark:to-slate-800 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 text-center h-[600px] flex flex-col justify-between col-start-11">
+            <span className="text-[9px] tracking-widest text-slate-400 dark:text-slate-500 uppercase block">Ad Space</span>
+            <div className="text-slate-500 text-xs font-semibold my-auto">
+              Responsive Right Sidebar Column Ad Area
+            </div>
+            <span className="text-[9px] text-slate-400 dark:text-slate-500 block">300 x 600 / Responsive</span>
+          </div>
+        </aside>
+
+      </main>
+
+      {/* AD PLACEMENT AREA: BOTTOM AD AREA */}
+      <div className="max-w-7xl mx-auto px-4 my-8 print:hidden">
+        <div className="bg-gradient-to-r from-slate-100 to-slate-200 dark:from-slate-900 dark:to-slate-800 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 text-center">
+          <span className="text-[10px] tracking-widest text-slate-400 dark:text-slate-500 block uppercase mb-1">Sponsored Advertisement</span>
+          <div className="h-24 flex items-center justify-center text-slate-500 text-sm font-medium">
+            Google AdSense Horizontal Footer Display Block
+          </div>
+        </div>
+      </div>
+
+      {/* FOOTER */}
+      <footer className="bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 py-12 transition-colors duration-200 print:hidden text-center text-xs text-slate-500 space-y-4">
+        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p>© 2026 Invoice Desk. All Rights Reserved. Create Free Commercial PDF Invoices Instantly.</p>
+          <div className="flex flex-wrap justify-center gap-4 text-slate-600 dark:text-slate-400 font-semibold">
+            <button onClick={() => { setActiveTab('home'); setPreviewMode(false); }} className="hover:text-indigo-600 transition-colors">Home</button>
+            <button onClick={() => setActiveTab('privacy')} className="hover:text-indigo-600 transition-colors">Privacy Policy</button>
+            <button onClick={() => setActiveTab('terms')} className="hover:text-indigo-600 transition-colors">Terms &amp; Conditions</button>
+            <button onClick={() => setActiveTab('disclaimer')} className="hover:text-indigo-600 transition-colors">Disclaimer</button>
+            <button onClick={() => setActiveTab('contact')} className="hover:text-indigo-600 transition-colors">Contact Us</button>
+          </div>
+        </div>
+      </footer>
+
+      {/* Embedded print styling for flawless paper mapping */}
+      <style>{`
+        @media print {
+          body, html {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+          #invoice-sheet {
+            box-shadow: none !important;
+            border: none !important;
+            max-width: 100% !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+          header, footer, aside, .print\\:hidden, .print-btn, button, .border-b-accent {
+            display: none !important;
+          }
+        }
+      `}</style>
+
+    </div>
+  );
+}
